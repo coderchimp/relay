@@ -1,5 +1,10 @@
 #!/usr/bin/perl
 
+use Text::CSV;
+my $csv = Text::CSV->new ( { binary => 1 } )  # should set binary attribute.
+                 or die "Cannot use CSV: ".Text::CSV->error_diag ();
+
+
 # This script assumes there is a ODSL_toptimes.csv file in the current dir
 # ODSL_toptimes.csv is a (a save as csv dump of the excel top times report)
 # The script takes as input the csv dump of the excel report of the file generated
@@ -11,6 +16,9 @@
 sub parse_csv {
   my $text = shift; ## data containing comma-separated values
   my @new = ();
+  
+  return $text =~ m/("[^"]+"|[^,]+)(?:,*)?/g;
+ 
   push(@new, $+) while $text =~ m{
     ## the first part groups the phrase inside the quotes
     "([^\"\\]*(?:\\.[^\"\\]*)*)",?
@@ -125,72 +133,76 @@ sub max_relay
   return ($besttime < 9999);
 }
 
-# This loop reads the file and identifies all the swimmers that would like to do relays
-# because of an issue where a parent did "no relay" it tries to identify non positive responses
-# to dump to standard error
-local $/ = "\r";
-my $header = <>;
-while (<>)
+open my $fh, "<:encoding(utf8)", $ARGV[0] or die "$ARGV[0]: $!";
+my $header = $csv->getline( $fh );
+while ( my $row = $csv->getline( $fh ) )
 {
-  my $line = $_;
-  if ($line =~ /^[\s\"]*$/)
+  @record = @{$row};
+  #my $counter = 0;
+  #foreach $item (@record)
+  #{
+  #  print "$counter !$item!\n";
+  #  $counter++;
+  #}
+  #print "\n";
+  my $use = 1; # default to 1 at coach request
+  if ($record[0] =~ /\w+/)
   {
-    #print STDERR "ignoring blank line - $line\n";
-  }
-  else
-  {
-    @record = parse_csv($line);
-
-    $use = 1; # default to 1 at coach request
-    if ($record[0] =~ /\w+/)
+    if ($record[6] =~ /relay/i || $record[6] =~ /no/i || $record[6] =~ /yes/i )
     {
-      if ($record[6] =~ /relay/i || $record[6] =~ /no/i || $record[6] =~ /yes/i )
+      #print STDERR "-- $line --\n$record[6]\n";
+      if (!($record[6] =~ /yes\s+relay/i))
       {
-        #print STDERR "-- $line --\n$record[6]\n";
-        if (!($record[6] =~ /yes\s+relay/i))
+        if ($record[6] =~ /no/i || $record[6] =~ /un/i)
         {
-          if ($record[6] =~ /no/i || $record[6] =~ /un/i)
+          if ($record[6] =~ /relay/i)
           {
-            #print STDERR "---- $record[0] Treating comment as No Relay ---- \"$record[6]\"\n";
             print "\"$record[0]\"\t$record[6]\n";
             $use = 0;
           }
-          elsif (!($record[6] =~ /yes/i ||
-                   $record[6] =~ /please/i ||
-                   $record[6] =~ /like/i || 
-                   $record[6] =~ /want/i || 
-                   $record[6] =~ /love/i ||
-                   $record[6] =~ /will/i ||
-                   $record[6] =~ /can/i ||
-                   $record[6] =~ /^\s*relays*\s*$/i))
-          {
-            print STDERR "$record[0] has unknown relay statement $record[6]\n";
-            $use = 1;
-          }
           else
           {
-            #print STDERR "$record[0] - treat as yes to relay $record[6]\n";
+            print STDERR "Negitive but unknown parse \"$record[0]\"\t$record[6]\n";
+            $use = 1;
           }
         }
-      }
-      elsif (!($record[6] =~ /^\s*$/i))
-      {
-        print STDERR "\nComments but no relay - $record[0] - $record[6]\n";
-        $use = 1;
-      }
-      else
-      {
-        #print STDERR "-- $line\n";
-        $use = 1;
+        elsif (!($record[6] =~ /yes/i ||
+                 $record[6] =~ /please/i ||
+                 $record[6] =~ /like/i || 
+                 $record[6] =~ /want/i || 
+                 $record[6] =~ /love/i ||
+                 $record[6] =~ /will/i ||
+                 $record[6] =~ /can/i ||
+                 $record[6] =~ /^\s*relays*\s*$/i))
+        {
+          print STDERR "$record[0] has unknown relay statement $record[6]\n";
+          $use = 1;
+        }
+        else
+        {
+          #print STDERR "$record[0] - treat as yes to relay $record[6]\n";
+        }
       }
     }
-    if ($use == 1)
+    elsif (!($record[6] =~ /^\s*$/i))
     {
-      $swimmers{$record[0]} = 1;
-      $usedswimmers{$record[0]} = 0;
+      #print STDERR "\nComments but no relay - $record[0] - $record[6]\n";
+      $use = 1;
+    }
+    else
+    {
+      #print STDERR "-- $line\n";
+      $use = 1;
     }
   }
+  if ($use == 1)
+  {
+    $swimmers{$record[0]} = 1;
+    $usedswimmers{$record[0]} = 0;
+  }
 }
+$csv->eof or $csv->error_diag();
+close $fh;
 
 # at this point $swimmers is a has with all the names of kids doing relays
 # the $used hash is initialized to everybody not used
@@ -228,7 +240,7 @@ while (<$fh>)
       if(/\"([\w\']+\s*\,\s\w+)/)
       {
         $name = $1;
-        #print $name;
+        #print "name = !$name!\n";
       }
       else
       {
