@@ -207,19 +207,18 @@ close $fh;
 # at this point $swimmers is a has with all the names of kids doing relays
 # the $used hash is initialized to everybody not used
 
-open(my $fh, "<", "ODSL_toptimes.csv") or die "cannot open < ODSL_toptimes.csv: $!";
-
-$header = <$fh>;
 $sex;
 $agegroup;
 $event;
 $length;
 print "\n";
-while (<$fh>)
+open my $fh, "<:encoding(utf8)", "ODSL_toptimes.csv" or die "ODSL_toptimes.csv: $!";
+my $header = $csv->getline( $fh );
+while ( my $row = $csv->getline( $fh ) )
 {
-  if (/^\w/)
+  if ($row->[0] =~ /^\w/)
   {
-    if (/(^Female[^\,]+)/ || /(^Male[^\,]+)/)
+    if ($row->[0] =~ /(^Female[^\,]+)/ || $row->[0] =~ /(^Male[^\,]+)/)
     {
       $category = $1;
       if ($category =~ /(\w*ale)\s+(.*)\s+(\d\d\d*)\s(\w+)/)
@@ -237,26 +236,25 @@ while (<$fh>)
     }
     else
     { 
-      if(/\"([\w\']+\s*\,\s\w+)/)
-      {
-        $name = $1;
-        #print "name = !$name!\n";
-      }
-      else
-      {
-        print STDERR "unable to handle name ****   ****  *****";
-        print STDERR;
-      }
+      $name = $row->[3];
+      $name =~ s/\s*$//;
+      #print "name = !$name!\n";
 
-      if(/\,(\d+):(\d+)\.(\d+)/)
+      #print "time = !$row->[1]!\n";
+      #!1:25.36S!
+      #!40.71S!
+      if($row->[1] =~ /(\d+):(\d+)\.(\d+)/)
       {
+        #print "minute ";
         $time = ($1*60) + $2 + ($3/100);
       }
       else
       {
-        /\,(\d+)\.(\d+)/;
+        #print "sec ";
+        $row->[1] =~ /(\d+)\.(\d+)/;
         $time = $1 + ($2/100);
       }
+      #print "converted = $time\n";
       $times{$name}{$event} = $time;
       push (@{$grid->{$sex}{$agegroup}{$event} }, $name);
     }
