@@ -153,7 +153,7 @@ while ( my $row = $csv->getline( $fh ) )
       #print STDERR "-- $line --\n$record[6]\n";
       if (!($record[6] =~ /yes\s+relay/i))
       {
-        if ($record[6] =~ /no/i || $record[6] =~ /un/i)
+        if ($record[6] =~ /no[t\s]/i || $record[6] =~ /un/i)
         {
           if ($record[6] =~ /relay/i)
           {
@@ -162,7 +162,7 @@ while ( my $row = $csv->getline( $fh ) )
           }
           else
           {
-            print STDERR "Negitive but unknown parse \"$record[0]\"\t$record[6]\n";
+            print STDERR "Negative but unknown parse \"$record[0]\"\t$record[6]\n";
             $use = 1;
           }
         }
