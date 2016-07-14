@@ -7,29 +7,13 @@ my $csv = Text::CSV->new ( { binary => 1 } )  # should set binary attribute.
                  or die "Cannot use CSV: ".Text::CSV->error_diag ();
 
 
-# This script assumes there is a ODSL_toptimes.csv file in the current dir
-# ODSL_toptimes.csv is a (a save as csv dump of the excel top times report)
-# The script takes as input the csv dump of the excel report of the file generated
+# This script assumes there is a TopTimes.xls file in the current dir
+# TopTimes.xls is a (a save as excel xls dump of the top times report)
+# The script takes as input the xls dump of the excel report of the file generated
 # Event -> Committed Athletes -> check the all button -> Export All Committed
 # How to run
-# relay.pl meet_export.csv > relays.csv
+# relay.pl meet_export.xls > relays.csv
 # Open relays.csv in excel and save as an xls for the coaches
-
-sub parse_csv {
-  my $text = shift; ## data containing comma-separated values
-  my @new = ();
-  
-  return $text =~ m/("[^"]+"|[^,]+)(?:,*)?/g;
- 
-  push(@new, $+) while $text =~ m{
-    ## the first part groups the phrase inside the quotes
-    "([^\"\\]*(?:\\.[^\"\\]*)*)",?
-      | ([^,]+),?
-      | ,
-    }gx;
-    push(@new, undef) if substr($text, -1,1) eq ',';
-    return @new; ## list of values that were comma-spearated
-}
 
 #This uses some globals because I was to lazy to implement this correctly
 #The events hash is a hash of arrays 
@@ -135,9 +119,9 @@ sub max_relay
   return ($besttime < 9999);
 }
 
-use Spreadsheet::ParseExcel;
-
 my $parser   = Spreadsheet::ParseExcel->new();
+
+#This loads the data for the specific meet
 my $workbook = $parser->parse($ARGV[0]);
 
 if ( !defined $workbook ) {
@@ -162,6 +146,8 @@ for my $worksheet ( $workbook->worksheets() )
     my $use = 1; # default to 1 at coach request
     if ($record[0] =~ /\w+/)
     {
+      $record[0] =~ s/\s*$//g;
+
       if ($record[6] =~ /relay/i || $record[6] =~ /no/i || $record[6] =~ /yes/i )
       {
         #print STDERR "-- $line --\n$record[6]\n";
@@ -225,51 +211,77 @@ $agegroup;
 $event;
 $length;
 print "\n";
-open my $fh, "<:encoding(utf8)", "ODSL_toptimes.csv" or die "ODSL_toptimes.csv: $!";
-my $header = $csv->getline( $fh );
-while ( my $row = $csv->getline( $fh ) )
+
+my $parser   = Spreadsheet::ParseExcel->new();
+my $workbook = $parser->parse("TopTimes.xls");
+
+if ( !defined $workbook ) {
+  die $parser->error(), ".\n";
+}
+
+for my $worksheet ( $workbook->worksheets() )
 {
-  if ($row->[0] =~ /^\w/)
+  my ( $row_min, $row_max ) = $worksheet->row_range();
+  my ( $col_min, $col_max ) = $worksheet->col_range();
+
+  $row_min++;
+  for my $row ( $row_min .. $row_max )
   {
-    if ($row->[0] =~ /(^Female[^\,]+)/ || $row->[0] =~ /(^Male[^\,]+)/)
+    my @record;
+    for my $col ( $col_min .. $col_max )
     {
-      $category = $1;
-      if ($category =~ /(\w*ale)\s+(.*)\s+(\d\d\d*)\s(\w+)/)
+      my $cell = $worksheet->get_cell( $row, $col );
+      if ($cell)
       {
-        $sex = $1;
-        $agegroup = $2;
-        $length = $3; 
-        $event = $4;
-        #print "sex = $sex age = $agegroup length = $length event = $event\n";
+        push @record, $cell->value;
       }
       else
       {
-        print "------------------------------- $category\n";
+        push @record, "";
       }
     }
-    else
-    { 
-      $name = $row->[3];
-      $name =~ s/\s*$//;
-      #print "name = !$name!\n";
-
-      #print "time = !$row->[1]!\n";
-      #!1:25.36S!
-      #!40.71S!
-      if($row->[1] =~ /(\d+):(\d+)\.(\d+)/)
+    if ($record[0] =~ /^\w/)
+    {
+      if ($record[0] =~ /(^Female[^\,]+)/ || $record[0] =~ /(^Male[^\,]+)/)
       {
-        #print "minute ";
-        $time = ($1*60) + $2 + ($3/100);
+        $category = $1;
+        if ($category =~ /(\w*ale)\s+(.*)\s+(\d\d\d*)\s(\w+)/)
+        {
+          $sex = $1;
+          $agegroup = $2;
+          $length = $3; 
+          $event = $4;
+          #print "sex = $sex age = $agegroup length = $length event = $event\n";
+        }
+        else
+        {
+          print "------------------------------- $category\n";
+        }
       }
       else
-      {
-        #print "sec ";
-        $row->[1] =~ /(\d+)\.(\d+)/;
-        $time = $1 + ($2/100);
+      { 
+        $name = $record[3];
+        $name =~ s/\s*$//;
+        #print "name = !$name!\n";
+
+        #print "time = !$record[1]!\n";
+        #!1:25.36S!
+        #!40.71S!
+        if($record[1] =~ /(\d+):(\d+)\.(\d+)/)
+        {
+          #print "minute ";
+          $time = ($1*60) + $2 + ($3/100);
+        }
+        else
+        {
+          #print "sec ";
+          $record[1] =~ /(\d+)\.(\d+)/;
+          $time = $1 + ($2/100);
+        }
+        #print "converted = $time\n";
+        $times{$name}{$event} = $time;
+        push (@{$grid->{$sex}{$agegroup}{$event} }, $name);
       }
-      #print "converted = $time\n";
-      $times{$name}{$event} = $time;
-      push (@{$grid->{$sex}{$agegroup}{$event} }, $name);
     }
   }
 }
