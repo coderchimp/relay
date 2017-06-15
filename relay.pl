@@ -153,7 +153,9 @@ for my $worksheet ( $workbook->worksheets() )
         #print STDERR "-- $line --\n$record[6]\n";
         if (!($record[6] =~ /yes\s+relay/i))
         {
-          if ($record[6] =~ /no[t\s]/i || $record[6] =~ /un/i)
+          if ($record[6] =~ /no[t\s]/i ||
+              $record[6] =~ /un/i ||
+              $record[6] =~ /won\'t/i )
           {
             if ($record[6] =~ /relay/i)
             {
