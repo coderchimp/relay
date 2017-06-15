@@ -155,7 +155,8 @@ for my $worksheet ( $workbook->worksheets() )
         {
           if ($record[6] =~ /no[t\s]/i ||
               $record[6] =~ /un/i ||
-              $record[6] =~ /won(\')*t/i )
+              $record[6] =~ /won(\')*t/i ||
+              $record[6] =~ /can(\')*t/i)
           {
             if ($record[6] =~ /relay/i)
             {
