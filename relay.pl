@@ -153,20 +153,17 @@ for my $worksheet ( $workbook->worksheets() )
         #print STDERR "-- $line --\n$record[6]\n";
         if (!($record[6] =~ /yes\s+relay/i))
         {
-          if ($record[6] =~ /no[t\s]/i ||
+          if ($record[6] =~ /^no$/i ||
+              $record[6] =~ /no[t\s]/i ||
               $record[6] =~ /un/i ||
               $record[6] =~ /won(\')*t/i ||
               $record[6] =~ /can(\')*t/i)
           {
-            if ($record[6] =~ /relay/i)
+            print "\"$record[0]\"\t$record[6]\n";
+            $use = 0;
+            if (!($record[6] =~ /relay/i))
             {
-              print "\"$record[0]\"\t$record[6]\n";
-              $use = 0;
-            }
-            else
-            {
-              print STDERR "Negative but unknown parse \"$record[0]\"\t$record[6]\n";
-              $use = 1;
+              print STDERR "Unknown but Negative parse \"$record[0]\"\t$record[6]\n";
             }
           }
           elsif (!($record[6] =~ /yes/i ||
